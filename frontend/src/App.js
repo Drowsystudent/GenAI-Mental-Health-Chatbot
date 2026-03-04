@@ -1,31 +1,33 @@
 import { useState, useRef, useEffect } from "react";
 
-// configure backend base URL
-// for local dev: start Flask on http://localhost:5050
-// LAST RESORT: we can try overriding with REACT_APP_API_URL (creating frontend/.env)
+// backend base URL (override by creating frontend/.env with REACT_APP_API_URL=...)
 const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5050";
 
 export default function App() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // crisis flag state
+  const [crisisLevel, setCrisisLevel] = useState("none");
+
   const bottomRef = useRef(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, loading]);
+  }, [messages, loading, crisisLevel]);
 
   const sendMessage = async () => {
-    if (!input.trim()) return;
+    if (!input.trim() || loading) return;
 
     const userText = input;
 
+    // add user message immediately
     setMessages((prev) => [...prev, { role: "user", content: userText }]);
     setInput("");
     setLoading(true);
 
     try {
-      /* ===== REAL BACKEND ===== */
       const res = await fetch(`${API_BASE_URL}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -39,11 +41,17 @@ export default function App() {
         throw new Error(msg);
       }
 
+      // read safety_level from backend response
+      const level = data?.safety_level || "none";
+      setCrisisLevel(level);
+
+      // add assistant reply
       setMessages((prev) => [
         ...prev,
         { role: "assistant", content: data.reply },
       ]);
     } catch (err) {
+      setCrisisLevel("none");
       setMessages((prev) => [
         ...prev,
         {
@@ -56,11 +64,36 @@ export default function App() {
     }
   };
 
+  const bannerStyles =
+    crisisLevel === "imminent"
+      ? "border-red-300 bg-red-50"
+      : "border-yellow-300 bg-yellow-50";
+
+  const bannerTitle =
+    crisisLevel === "imminent" ? "Crisis resources" : "Support resources";
+
   return (
     <div className="flex flex-col h-screen bg-gray-100">
       <header className="p-4 bg-purple-600 text-white text-center text-xl font-semibold">
         Mental Health Support Chatbot
       </header>
+
+      {/* crisis banner driven by backend safety_level */}
+      {crisisLevel !== "none" && (
+        <div className={`mx-4 mt-3 p-3 rounded-lg border ${bannerStyles}`}>
+          <div className="font-semibold">{bannerTitle}</div>
+          <div className="text-sm">
+            If you’re in immediate danger, call local emergency services. In the
+            U.S., call or text <b>988</b> (Suicide &amp; Crisis Lifeline).
+          </div>
+          <button
+            className="mt-2 text-sm underline"
+            onClick={() => setCrisisLevel("none")}
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       <main className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.map((msg, idx) => (
