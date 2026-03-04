@@ -20,7 +20,7 @@ def chat():
         return jsonify({"error": "Missing 'message'"}), 400
 
     reply, safety_level = generate_reply(user_message)
-return jsonify({"reply": reply, "safety_level": safety_level}), 200
+    return jsonify({"reply": reply, "safety_level": safety_level}), 200
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5050, debug=True)
