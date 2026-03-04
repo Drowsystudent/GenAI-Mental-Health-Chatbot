@@ -1,5 +1,10 @@
 import { useState, useRef, useEffect } from "react";
 
+// configure backend base URL
+// for local dev: start Flask on http://localhost:5050
+// LAST RESORT: we can try overriding with REACT_APP_API_URL (creating frontend/.env)
+const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5050";
+
 export default function App() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
@@ -13,37 +18,37 @@ export default function App() {
   const sendMessage = async () => {
     if (!input.trim()) return;
 
-    setMessages((prev) => [...prev, { role: "user", content: input }]);
+    const userText = input;
+
+    setMessages((prev) => [...prev, { role: "user", content: userText }]);
     setInput("");
     setLoading(true);
 
     try {
-      /* ===== REAL BACKEND (ENABLE LATER) ===== */
-      /*
-      const res = await fetch("http://localhost:8000/chat", {
+      /* ===== REAL BACKEND ===== */
+      const res = await fetch(`${API_BASE_URL}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: input }),
+        body: JSON.stringify({ message: userText }),
       });
-      const data = await res.json();
-      */
 
-      /* ===== MOCK BACKEND ===== */
-      await new Promise((res) => setTimeout(res, 1200));
-      const data = {
-        reply: "This is a mock response for the prototype. I’m here to listen.",
-      };
+      const data = await res.json();
+
+      if (!res.ok) {
+        const msg = data?.error || "Sorry, something went wrong.";
+        throw new Error(msg);
+      }
 
       setMessages((prev) => [
         ...prev,
         { role: "assistant", content: data.reply },
       ]);
-    } catch {
+    } catch (err) {
       setMessages((prev) => [
         ...prev,
         {
           role: "assistant",
-          content: "Sorry, something went wrong.",
+          content: err?.message || "Sorry, something went wrong.",
         },
       ]);
     } finally {
@@ -52,51 +57,50 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="w-full max-w-2xl bg-white shadow-lg rounded-xl flex flex-col h-[80vh]">
-        <header className="p-4 border-b text-center font-semibold text-lg">
-          GenAI Mental Health Chatbot
-        </header>
+    <div className="flex flex-col h-screen bg-gray-100">
+      <header className="p-4 bg-purple-600 text-white text-center text-xl font-semibold">
+        Mental Health Support Chatbot
+      </header>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
-          {messages.map((m, i) => (
-            <div
-              key={i}
-              className={`max-w-[75%] px-4 py-2 rounded-lg text-sm ${
-                m.role === "user"
-                  ? "bg-user ml-auto text-right"
-                  : "bg-bot mr-auto"
-              }`}
-            >
-              {m.content}
-            </div>
-          ))}
-
-          {loading && (
-            <div className="bg-bot px-4 py-2 rounded-lg text-sm w-fit">
-              Typing…
-            </div>
-          )}
-
-          <div ref={bottomRef} />
-        </div>
-
-        <div className="p-4 border-t flex gap-2">
-          <input
-            className="flex-1 border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary"
-            placeholder="Type your message…"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && sendMessage()}
-          />
-          <button
-            onClick={sendMessage}
-            className="bg-primary text-white px-4 py-2 rounded-lg hover:opacity-90"
+      <main className="flex-1 overflow-y-auto p-4 space-y-4">
+        {messages.map((msg, idx) => (
+          <div
+            key={idx}
+            className={`max-w-lg p-3 rounded-lg ${
+              msg.role === "user"
+                ? "bg-blue-500 text-white ml-auto"
+                : "bg-white text-gray-800 mr-auto"
+            }`}
           >
-            Send
-          </button>
-        </div>
-      </div>
+            {msg.content}
+          </div>
+        ))}
+
+        {loading && (
+          <div className="max-w-lg p-3 rounded-lg bg-white text-gray-800 mr-auto">
+            Typing...
+          </div>
+        )}
+
+        <div ref={bottomRef} />
+      </main>
+
+      <footer className="p-4 bg-white flex gap-2">
+        <input
+          className="flex-1 border rounded-lg p-2 focus:outline-none"
+          placeholder="Type your message..."
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && sendMessage()}
+        />
+        <button
+          className="bg-purple-600 text-white px-4 py-2 rounded-lg disabled:opacity-50"
+          onClick={sendMessage}
+          disabled={loading}
+        >
+          Send
+        </button>
+      </footer>
     </div>
   );
 }
