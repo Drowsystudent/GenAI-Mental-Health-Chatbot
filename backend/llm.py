@@ -70,20 +70,18 @@ def _crisis_message(level: str) -> str:
     return base
 
 
-def generate_reply(user_text: str) -> str:
+def generate_reply(user_text: str) -> tuple[str, str]:
     """
-    Phase 1 prototype response with a basic crisis safeguard.
-    Later, replace the normal path with an OpenAI call,
-    but KEEP the safeguard checks before any model response.
+    returns (reply, safety_level).
+    safety_level is one of: "none" | "elevated" | "imminent"
     """
     safety = _detect_crisis(user_text)
 
     if safety.level != "none":
-        return _crisis_message(safety.level)
+        return _crisis_message(safety.level), safety.level
 
     # normal prototype response
     return (
         "I hear you. Thanks for sharing that. "
         "If you want to talk more about it, I'm here to listen."
-    )
-
+    ), "none"
