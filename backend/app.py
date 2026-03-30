@@ -41,11 +41,12 @@ def chat():
 
     data = request.get_json(silent=True) or {}
     user_message = (data.get("message") or "").strip()
+    history = data.get("history") or []
 
     if not user_message:
         return jsonify({"error": "Missing 'message'"}), 400
 
-    reply, safety_level = generate_reply(user_message)
+    reply, safety_level = generate_reply(user_message, history)
 
     return jsonify({
         "reply": reply,

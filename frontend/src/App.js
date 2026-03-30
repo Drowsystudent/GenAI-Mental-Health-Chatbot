@@ -19,19 +19,33 @@ export default function App() {
 
   const sendMessage = async () => {
     if (!input.trim() || loading) return;
-
-    const userText = input;
-
-    setMessages((prev) => [...prev, { role: "user", content: userText }]);
+  
+    const userText = input.trim();
+    const newUserMessage = { role: "user", content: userText };
+  
+    const updatedMessages = [...messages, newUserMessage];
+  
+    setMessages(updatedMessages);
     setInput("");
     setLoading(true);
-
+  
     try {
+      // use the newest local version of messages
+      const recentHistory = updatedMessages.slice(-6).map((msg) => ({
+        role: msg.role,
+        content: msg.content,
+      }));
+  
       const res = await fetch(`${API_BASE_URL}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: userText }),
+        body: JSON.stringify({
+          message: userText,
+          history: recentHistory.slice(0, -1), // don't send newest user message twice
+        }),
       });
+  
+
 
       const data = await res.json();
 
@@ -79,7 +93,7 @@ export default function App() {
         <div className={`mx-4 mt-3 p-3 rounded-lg border ${bannerStyles}`}>
           <div className="font-semibold">{bannerTitle}</div>
           <div className="text-sm">
-            If you’re in immediate danger, call local emergency services. In the
+            If you're in immediate danger, call local emergency services. In the
             U.S., call or text <b>988</b>.
           </div>
           <button
