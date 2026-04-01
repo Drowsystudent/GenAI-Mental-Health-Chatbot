@@ -9,7 +9,7 @@ from llm import generate_reply
 app = Flask(__name__)
 
 # Check if build folder exists (production) or not (local dev)
-build_folder = os.path.join(ls.path-dirname(__file__), '../frontend/build')
+build_folder = os.path.join(os.path-dirname(__file__), '../frontend/build')
 if os.path.exists(build_folder):
     app = Flask(__name__, static_folder=build_folder, static_url_path='')
 else:
