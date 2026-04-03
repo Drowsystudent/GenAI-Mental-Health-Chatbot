@@ -15,14 +15,17 @@ def get_openai_key():
         try:
             import boto3
             client = boto3.client('secretsmanager', region_name='us-east-2')
-            response - client.get_secret_value(SecretId=secret_arn)
+            response = client.get_secret_value(SecretId=secret_arn)
             secret = json.loads(response['SecretString'])
+            print(f"Secret retrived: {bool(secret.get('OPENAI_API_KEY'))}")
             return secret['OPENAI_API_KEY']
         except Exception as e:
             print(f"Failed to load from Secrets Manager: {e}")
 
     load_dotenv(dotenv_path="backend/.env")
-    return os.getenv("OPENAI_API_KEY")
+    key = os.getenv("OPENAI_API_KEY")
+    print(f"Loaded from .env: {bool(key)}")
+    return key
 
 API_KEY = get_openai_key()
 print("API KEY LOADED:", bool(API_KEY))
