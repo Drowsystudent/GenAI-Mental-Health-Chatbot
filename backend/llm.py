@@ -1,15 +1,30 @@
 import os
 import re
 import random
+import json
 from dataclasses import dataclass
 from typing import List, Tuple
 
 from dotenv import load_dotenv
 from openai import OpenAI, RateLimitError
 
-load_dotenv(dotenv_path="backend/.env")
+# Get API Key either through EC2 instance or locally.
+def get_openai_key():
+    secret_arn = os.environ.get('OPENAI_SECRET_ARN')
+    if secret_arn:
+        try:
+            import boto3
+            client = boto3.client('secretsmanager', region_name='us-east-2')
+            response - client.get_secret_value(SecretId=secret_arn)
+            secret = json.loads(response['SecretString'])
+            return secret['OPENAI_API_KEY']
+        except Exception as e:
+            print(f"Failed to load from Secrets Manager: {e}")
 
-API_KEY = os.getenv("OPENAI_API_KEY")
+    load_dotenv(dotenv_path="backend/.env")
+    return os.getenv("OPENAI_API_KEY")
+
+API_KEY = get_openai_key()
 print("API KEY LOADED:", bool(API_KEY))
 
 MODEL = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
