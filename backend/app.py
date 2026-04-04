@@ -1,4 +1,7 @@
 import os
+import boto3
+import logging
+from datetime import datetime
 print("RUNNING FROM:", os.getcwd())
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
@@ -18,6 +21,34 @@ else:
 # Limit request size to 32 KB
 app.config["MAX_CONTENT_LENGTH"] = 32 * 1024
 
+# Set up CloudWatch logging
+cloudwatch = boto3.client('logs', region_name='us-east-2')
+
+def log_to_cloudwatch(log_group, message, level='INFO'):
+    """Send log to CloudWatch"""
+    try:
+        log_stream = datetime.now().strftime('%Y-%m-%d')
+
+        # Create log stream if it doesn't exist
+        try:
+            cloudwatch.create_log_stream(
+                logGroupName=log_group,
+                logStreamName=log_stream
+            )
+        except cloudwatch.exceptions.ResourceAlreadyExistsException:
+            pass
+
+        # Put log event
+        cloudwatch.put_log_events(
+            logGroupName=log_group,
+            logStreamName=log_stream,
+            logEvents=[{
+                'timestamp': int(datetime.now().timestamp() * 1000),
+                'message': f"[{level}] {message}"
+            }]
+        )
+    except Exception as e:
+        print(f"CloudWatch logging failed: {e}")
 
 @app.errorhandler(RequestEntityTooLarge)
 def length_error(e):
@@ -54,7 +85,21 @@ def chat():
     if not user_message:
         return jsonify({"error": "Missing 'message'"}), 400
 
+    # Log API call to CloudWatch
+    log_to_cloudwatch(
+            '/mental-health-chatbot/api-calls',
+            f"User message received: {user_message[:50]}..."
+    )
+
     reply, safety_level = generate_reply(user_message, history)
+
+    # Log crisis detection if needed
+    if safety_level == 'imminent':
+        log_to_cloudwatch(
+            '/mental-health-chatbot/crisis-detection',
+            f"Crisis detected! Message: {user_message}",
+            level='ALERT'
+        )
 
     return jsonify({
         "reply": reply,
