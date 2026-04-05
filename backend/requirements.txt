@@ -2,3 +2,6 @@ Flask==3.0.0
 flask-cors==4.0.0
 openai
 python-dotenv
+boto3
+gunicorn
+nltk
