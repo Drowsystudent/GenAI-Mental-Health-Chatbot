@@ -11,12 +11,28 @@ export default function App() {
   // NEW: crisis popup state
   const [showCrisisPopup, setShowCrisisPopup] = useState(false);
 
+  // Grounding techniques popup state
+  const[showGroundingPopup, setShowGroundingPopup] = useState(false);
+  const[groundingText, setGroundingText] = useState("none");
+
   const bottomRef = useRef(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading, crisisLevel]);
 
+  const fetchGroundingTechniques = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/grounding`);
+      const data = await res.json();
+      setGroundingText(data.grounding || "Grounding techniques unavailable.");
+      setShowGroundingPopup(true);
+    } catch (err) {
+      setGroundingText("Unable to load grounding techniques.");
+      setShowGroundingPopup(true);
+    }
+  };
+	
   const sendMessage = async () => {
     if (!input.trim() || loading) return;
   
@@ -139,6 +155,14 @@ export default function App() {
           >
             📄 Crisis
           </button>
+	  
+	  {/* Grounding Button */}
+	  <button
+	    onClick={fetchGroundingTechniques}
+	    className="flex items-center gap-1 text-sm bg-green-100 text-green-600 px-3 py-1 rounded-full mr-2"
+	  >
+	    🧘 Grounding
+	  </button>
 
           {/* Input */}
           <input
@@ -200,6 +224,31 @@ export default function App() {
 
             </div>
           </div>
+        </div>
+      )}
+
+      {/* GROUNDING TECHNIQUES POPUP*/}
+      {showGroundingPopup && (
+        <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+	  <div className="bg-white w-11/12 max-w-md rounded-2xl p-6 relative shadow-lg max-h-96 overflow-y-auto">
+	    <button
+	      onClick={() => setShowGroundingPopup(false)}
+	      className="absolute top-3 right-4 text-gray-500 text-xl"
+	    >
+	      x
+	    </button>
+
+	    <h2 className="text-xl font-semibold mb-2">
+	      🧘 Grounding Techniques
+	    </h2>
+	    <p className="text-sm text-gray-600 mb-4">
+	      Try these exercises to help you feel more present and calm.
+	    </p>
+
+	    <div className="bg-gray-100 p-4 rounded-xl whitespace-pre-wrap">
+	      {groundingText}
+	    </div>
+	  </div>
         </div>
       )}
     </div>

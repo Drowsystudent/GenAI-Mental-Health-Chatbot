@@ -1,6 +1,7 @@
 import os
 import boto3
 import logging
+import random
 from datetime import datetime
 print("RUNNING FROM:", os.getcwd())
 from flask import Flask, request, jsonify, send_from_directory
@@ -8,6 +9,7 @@ from flask_cors import CORS
 from werkzeug.exceptions import RequestEntityTooLarge
 
 from llm import generate_reply
+s3 = boto3.client('s3', region_name='us-east-2')
 
 app = Flask(__name__)
 
@@ -72,6 +74,35 @@ CORS(app, resources={
 def health():
     return jsonify({"ok": True})
 
+@app.get("/grounding")
+def grounding():
+    """Fetch grounding techniques from S3"""
+    try:
+        # List all files in grounding-exercises folder
+        response = s3.list_objects_v2(
+            Bucket=os.environ.get('S3_BUCKET_NAME'),
+            Prefix='grounding-exercises/'
+        )
+
+        # Get all file keys (exclude the folder itself)
+        files = [obj['Key'] for obj in response.get('Contents', [])
+                 if not obj['Key'].endswith('/')]
+
+        if not files:
+            return jsonify({"grounding": "No grounding techniques available."}), 200
+
+        # Pick random file
+        random_file = random.choice(files)
+
+        # Fetch the file
+        obj = s3.get_object(Bucket=os.environ.get('S3_BUCKET_NAME'), Key=random_file)
+        text = obj['Body'].read().decode('utf-8')
+
+        return jsonify({"grounding": text}), 200
+    except Exception as e:
+        print(f"S3 grounding fetch failed: {e}")
+        return jsonify({"grounding": "Grounding techniques unavailable."}), 200
+
 
 @app.post("/chat")
 def chat():
@@ -93,18 +124,21 @@ def chat():
 
     reply, safety_level = generate_reply(user_message, history)
 
-    # Log crisis detection if needed
-    if safety_level == 'imminent':
+    # Prepare response
+    response_data = {
+        "reply": reply,
+        "safety_level": safety_level
+    }
+
+    # Log crisis detection if needed and add resources
+    if safety_level == 'elevated':
         log_to_cloudwatch(
             '/mental-health-chatbot/crisis-detection',
             f"Crisis detected! Message: {user_message}",
             level='ALERT'
         )
 
-    return jsonify({
-        "reply": reply,
-        "safety_level": safety_level
-    }), 200
+    return jsonify(response_data), 200
 
 
 # Serve React app in production (only if build folder exists)
