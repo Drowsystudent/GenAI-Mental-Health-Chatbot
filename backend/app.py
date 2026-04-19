@@ -23,8 +23,9 @@ else:
 # Limit request size to 32 KB
 app.config["MAX_CONTENT_LENGTH"] = 32 * 1024
 
-# Set up CloudWatch logging
-cloudwatch = boto3.client('logs', region_name='us-east-2')
+# Set up CloudWatch logging and metrics
+cloudwatch_logs = boto3.client('logs', region_name='us-east-2')
+cloudwatch_metrics = boto3.client('cloudwatch', region_name='us-east-2')
 
 def log_to_cloudwatch(log_group, message, level='INFO'):
     """Send log to CloudWatch"""
@@ -33,15 +34,15 @@ def log_to_cloudwatch(log_group, message, level='INFO'):
 
         # Create log stream if it doesn't exist
         try:
-            cloudwatch.create_log_stream(
+            cloudwatch_logs.create_log_stream(
                 logGroupName=log_group,
                 logStreamName=log_stream
             )
-        except cloudwatch.exceptions.ResourceAlreadyExistsException:
+        except cloudwatch_logs.exceptions.ResourceAlreadyExistsException:
             pass
 
         # Put log event
-        cloudwatch.put_log_events(
+        cloudwatch_logs.put_log_events(
             logGroupName=log_group,
             logStreamName=log_stream,
             logEvents=[{
@@ -123,6 +124,29 @@ def chat():
     )
 
     reply, safety_level = generate_reply(user_message, history)
+
+    # Send metric to CloudWatch
+    if safety_level in ['elevated', 'imminent']:
+        try:
+            cloudwatch_metrics.put_metric_data(
+                Namespace='MentalHealthChatbot',
+                MetricData=[
+                    {
+                        'MetricName': 'CrisisDetectionCount',
+                        'Value': 1,
+                        'Unit': 'Count',
+                        'Dimensions': [
+                            {
+                                'Name': 'SafetyLevel',
+                                'Value': safety_level
+                            }
+                        ]
+                    }
+                ]
+            )
+            print(f"CloudWatch metric sent: {safety_level}")
+        except Exception as e:
+            print(f"Cloudwatch metric failed: {e}")
 
     # Prepare response
     response_data = {
