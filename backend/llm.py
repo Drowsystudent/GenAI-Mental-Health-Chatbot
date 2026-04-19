@@ -2,11 +2,22 @@ import os
 import re
 import random
 import json
+import nltk
+from nltk.sentiment import SentimentIntensityAnalyzer
 from dataclasses import dataclass
 from typing import List, Tuple
 
 from dotenv import load_dotenv
 from openai import OpenAI, RateLimitError
+
+# Download VADER lexicon
+try:
+    nltk.data.find('vader_lexicon')
+except LookupError:
+    nltk.download('vader_lexicon', quiet=True)
+
+# Initialize sentiment analyzer
+sia = SentimentIntensityAnalyzer()
 
 # Get API Key either through EC2 instance or locally.
 def get_openai_key():
@@ -138,6 +149,7 @@ def _detect_crisis(user_text: str) -> SafetyResult:
 
     matched: List[str] = []
 
+    # 1. KEYWORD DETECTION (most reliable)
     # Check strong signals first
     for name, pattern in _IMMINENT_PATTERNS:
         if pattern.search(text):
@@ -161,6 +173,24 @@ def _detect_crisis(user_text: str) -> SafetyResult:
     for name, pattern in _ELEVATED_PATTERNS:
         if pattern.search(text):
             matched.append(name)
+
+    # 2. SENTIMENT ANALYSIS (secondary, for edge cases)
+    sentiment_scores = sia.polarity_scores(text)
+    compound_score = sentiment_scores['compound'] # Range: -1 (very negative) to +1 (very positive)
+
+    print(f"Sentiment analysis: {compound_score:.3f} | Message: {text[:50]}...")
+
+    # Only use sentiment if:
+    # - No keywords matched (catches things keywords miss)
+    # - AND sentiment is EXTREMELY negative
+    if not matched and compound_score <= -0.8:
+        matched.append("extreme_negative_sentiment_no_keywords")
+        print(f"EXTREME NEGATIVE (no keywords): {compound_score}")
+
+    # OR if keywords matched + very negative sentiment, strengthen the signal
+    elif matched and compound_score <= -0.6:
+        matched.append("negative_sentiment_with_keywords")
+        print(f"NEGATIVE SENTIMENT + KEYWORDS: {compound_score}")
 
     if matched:
         # If there's any strong + soft combo → escalate harder
